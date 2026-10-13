@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tugas Rutin 11 (v2) — Toko Kopi</title>
+<style>
+:root{--bg:#fbf6f0;--fg:#2b1d12;--mu:#7d6a58;--cd:#fff;--bd:#eadccb;--ac:#b45309;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#16100a;--fg:#f4e9dc;--mu:#b5a28f;--cd:#221911;--bd:#3a2c1f}}
+:root[data-theme="dark"]{--bg:#16100a;--fg:#f4e9dc;--mu:#b5a28f;--cd:#221911;--bd:#3a2c1f}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0 auto;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,sans-serif;padding:16px;max-width:760px}
+h1{font-size:22px;margin:0}h2{font-size:17px;margin:16px 0 8px}
+.sub{color:var(--mu);font-size:13px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}
+button{font:inherit;font-size:14px;padding:8px 12px;border-radius:10px;border:1px solid var(--bd);background:var(--cd);color:var(--fg)}
+button.on,.pri{background:var(--ac);border-color:var(--ac);color:#fff}
+.card{background:var(--cd);border:1px solid var(--bd);border-radius:14px;padding:14px;margin:10px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.grid .card{margin:0}
+input,select{font:inherit;width:100%;box-sizing:border-box;padding:9px;border-radius:10px;border:1px solid var(--bd);background:var(--bg);color:var(--fg);margin:4px 0}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px}
+.toast{padding:10px 12px;border-radius:10px;margin:8px 0;font-size:14px;border:1px solid var(--bd)}
+.t403{background:#dc262622;border-color:#dc2626}.t200{background:#16a34a22;border-color:#16a34a}
+.wrap{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border-bottom:1px solid var(--bd);padding:6px 8px;text-align:left;white-space:nowrap}
+pre{background:var(--cd);border:1px solid var(--bd);border-radius:10px;padding:10px;overflow-x:auto;font-size:12.5px;margin:6px 0}
+details{margin:6px 0}summary{font-weight:600;padding:8px 0}
+.y{color:#16a34a;font-weight:700}.n{color:#dc2626;font-weight:700}
+</style></head><body>
+<h1>☕ Toko Kopi — Tugas Rutin 11 (v2)</h1>
+<div class="sub">E-Commerce DB + Secure Auth. Semua berjalan di browser (simulasi); Tinker membaca data hidup dari toko ini.</div>
+<div class="tabs" id="tabs"></div>
+<div id="toast"></div>
+<div id="v"></div>
+<script>
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rp=n=>'Rp '+n.toLocaleString('id-ID');
+const cats=['Biji Kopi','Alat Seduh','Merchandise'];
+const base=[['Arabika Gayo',0],['Robusta Lampung',0],['Toraja Kalosi',0],['Flores Bajawa',0],['Kintamani',0],['V60 Dripper',1],['French Press',1],['Moka Pot',1],['Grinder Manual',1],['Gelas Ukur',1],['Mug Kopi',2],['Tote Bag',2],['Kaos Barista',2],['Topi',2]];
+const sizes=['250g','500g','Mini','Pro'];
+const products=[];let pid=1;
+for(let r=0;r<4;r++)base.forEach(([n,c])=>{if(products.length<56)products.push({id:pid++,name:n+' '+sizes[r],cat:c,price:20000+((pid*13)%40)*5000,stock:3+(pid*7)%25,tags:[['baru','populer','diskon'][pid%3]]})});
+let users=[{id:1,name:'Pemilik',email:'admin@kopi.test',role:'admin',pw:'password'},{id:2,name:'Staf',email:'editor@kopi.test',role:'editor',pw:'password'},{id:3,name:'Pelanggan',email:'user@kopi.test',role:'user',pw:'password'}];
+let orders=[],oid=1,cart={},me=null,tab='shop',cat='',page=1,toast=null;const PER=6;
+const T={shop:'🛍 Toko',acc:'🔐 Akun',pol:'🛡 Policy',tink:'⌨️ Tinker',erd:'🗺 ERD',code:'💻 Kode'};
+const tn=(c,m)=>toast=[c,m];
+const can={update:(u,ownerId)=>u.id===ownerId||u.role==='editor',delete:(u,ownerId)=>u.id===ownerId||u.role==='admin'};
+function tbl(h,r){return `<div class="wrap"><table><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${r.map(x=>`<tr>${x.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table></div>`}
+function cartTotal(){return Object.entries(cart).reduce((s,[id,q])=>s+products[id-1].price*q,0)}
+const V={
+shop:()=>{const f=products.filter(p=>!cat||p.cat==cat);const pg=Math.ceil(f.length/PER);if(page>pg)page=1;
+ const n=Object.values(cart).reduce((a,b)=>a+b,0);
+ return `<div class="row"><select style="width:auto" onchange="cat=this.value;page=1;render()"><option value="">Semua kategori</option>${cats.map((c,i)=>`<option value="${i}" ${cat!=='' &&cat==i?'selected':''}>${c}</option>`).join('')}</select><b>🛒 ${n} item · ${rp(cartTotal())}</b><button class="pri" onclick="checkout()">Checkout</button></div>
+ <div class="grid" style="margin-top:10px">${f.slice((page-1)*PER,page*PER).map(p=>`<div class="card"><div class="sub">${cats[p.cat]} · #${p.tags[0]}</div><b>${esc(p.name)}</b><div>${rp(p.price)}</div><div class="sub">stok ${p.stock}</div><button style="margin-top:6px" onclick="add(${p.id})">+ Keranjang</button></div>`).join('')}</div>
+ <div class="row" style="justify-content:center"><button ${page<=1?'disabled':''} onclick="page--;render()">‹</button><span class="sub">Hal ${page}/${pg} · ${f.length} produk</span><button ${page>=pg?'disabled':''} onclick="page++;render()">›</button></div>`},
+acc:()=>{let h='';
+ if(me)h+=`<div class="card">Login sebagai <b>${esc(me.name)}</b> (${me.role}) <div class="row"><button onclick="me=null;tn('t200','Logout berhasil.');render()">Logout</button></div></div>
+ <div class="card"><b>Riwayat order ${esc(me.name)}</b>${tbl(['#','item','total'],orders.filter(o=>o.user_id===me.id).map(o=>[o.id,o.items.length,rp(o.items.reduce((s,i)=>s+i.price*i.qty,0))]))||''}${orders.some(o=>o.user_id===me.id)?'':'<div class="sub">Belum ada order — checkout dulu di tab Toko.</div>'}</div>`;
+ else h+=`<div class="card"><b>Login</b><select id="lu">${users.map(u=>`<option value="${u.id}">${u.email} (${u.role})</option>`).join('')}</select><input id="lp" type="password" value="password"><div class="row"><button class="pri" onclick="login()">Login</button></div><div class="sub">Password akun contoh: password</div></div>
+ <div class="card"><b>Register</b> (role otomatis: user)<input id="rn" placeholder="Nama"><input id="re" placeholder="Email"><input id="rp" type="password" placeholder="Password (min 8)"><div class="row"><button class="pri" onclick="reg()">Daftar</button></div></div>`;
+ return h},
+pol:()=>{const o=window.owner||3;
+ return `<div class="card"><b>PostPolicy — siapa boleh apa?</b><div class="sub">Pemilik post:</div><select onchange="window.owner=+this.value;render()">${users.map(u=>`<option value="${u.id}" ${u.id==o?'selected':''}>${esc(u.name)} (${u.role})</option>`).join('')}</select>
+ ${tbl(['Pengguna','role','update','delete'],users.map(u=>[esc(u.name),u.role,can.update(u,o)?'<span class="y">✓</span>':'<span class="n">✗ 403</span>',can.delete(u,o)?'<span class="y">✓</span>':'<span class="n">✗ 403</span>']))}</div>
+ <div class="card"><b>Tes proteksi route</b><div class="row"><select id="pr" style="width:auto"><option>/dashboard</option><option>/admin</option><option>/admin/users</option></select><select id="pu" style="width:auto"><option value="">Tamu (belum login)</option>${users.map(u=>`<option value="${u.id}">${esc(u.name)} (${u.role})</option>`).join('')}</select><button class="pri" onclick="probe()">Kunjungi</button></div></div>`},
+tink:()=>{const Q=tinker();return `<div class="sub">Query dijalankan terhadap data toko saat ini (coba checkout/daftar dulu, lalu jalankan lagi).</div>`+Object.entries(Q).map(([k,f])=>`<div class="card"><pre>&gt;&gt;&gt; ${esc(k)}</pre><pre>= ${esc(f())}</pre></div>`).join('')},
+erd:()=>`<div class="card"><pre>users ──&lt; orders ──&lt; order_items &gt── products &gt── categories
+  │                                    │
+  └──&lt; products (user_id)              └──&lt;&gt── tags (product_tag)</pre>${tbl(['tabel','kolom penting'],[['users','id, name, email, password, role'],['categories','id, name'],['products','id, category_id*, user_id*, name, price, stock'],['orders','id, user_id*, status'],['order_items','id, order_id*, product_id*, qty, price'],['tags','id, name'],['product_tag','product_id*, tag_id* (pivot)']])}<div class="sub">* = foreign key (constrained)</div></div>`,
+code:()=>C.map(([t,c])=>`<details><summary>${t}</summary><pre>${esc(c)}</pre></details>`).join('')};
+function tinker(){return{
+ 'Product::count()':()=>products.length,
+ "Product::with('category')->first()":()=>{const p=products[0];return `{ name: "${p.name}", price: ${p.price}, category: "${cats[p.cat]}" }`},
+ "Product::where('stock','<',5)->count()":()=>products.filter(p=>p.stock<5).length,
+ 'User::count()':()=>users.length,
+ 'Order::count()':()=>orders.length,
+ "Order::withSum('items as total','price')->latest()->first()":()=>{const o=orders[orders.length-1];return o?`{ id: ${o.id}, total: ${o.items.reduce((s,i)=>s+i.price*i.qty,0)} }`:'null (belum ada order)'},
+ "Product::whereRelation('category','name','Alat Seduh')->count()":()=>products.filter(p=>p.cat===1).length}}
+function add(id){cart[id]=(cart[id]||0)+1;tn('t200','Ditambahkan ke keranjang.');render()}
+function checkout(){if(!me){tn('t403','302 → /login (middleware auth). Login dulu di tab Akun.');render();return}
+ const ids=Object.keys(cart);if(!ids.length){tn('t403','Keranjang kosong.');render();return}
+ const o={id:oid++,user_id:me.id,items:ids.map(i=>({product_id:+i,qty:cart[i],price:products[i-1].price}))};
+ ids.forEach(i=>products[i-1].stock=Math.max(0,products[i-1].stock-cart[i]));orders.push(o);cart={};tn('t200',`Order #${o.id} dibuat (DB::transaction).`);render()}
+function login(){const u=users.find(x=>x.id==document.getElementById('lu').value);if(document.getElementById('lp').value!==u.pw){tn('t403','Kredensial salah.')}else{me=u;tn('t200','Login berhasil.')}render()}
+function reg(){const n=document.getElementById('rn').value.trim(),e=document.getElementById('re').value.trim(),p=document.getElementById('rp').value;
+ if(!n||!/^\S+@\S+\.\S+$/.test(e))tn('t403','Nama & email valid wajib diisi.');
+ else if(p.length<8)tn('t403','Password minimal 8 karakter.');
+ else if(users.some(u=>u.email===e))tn('t403','Email sudah terdaftar (unique:users).');
+ else{const u={id:users.length+1,name:n,email:e,role:'user',pw:p};users.push(u);me=u;tn('t200','Registrasi berhasil, otomatis login sebagai user.')}
+ render()}
+function probe(){const p=pr.value,uid=pu.value,u=users.find(x=>x.id==uid);
+ let m,c='t403';if(!u)m=`GET ${p} → 302 redirect /login (middleware auth)`;
+ else if(p!=='/dashboard'&&u.role!=='admin')m=`GET ${p} → 403 Forbidden (middleware role:admin, role kamu: ${u.role})`;
+ else{m=`GET ${p} → 200 OK`;c='t200'}tn(c,m);render()}
+const C=[['Migration: products + FK',`$t->foreignId('category_id')->constrained()->cascadeOnDelete();
+$t->foreignId('user_id')->constrained()->cascadeOnDelete();
+$t->string('name');
+$t->decimal('price', 12, 2);
+$t->unsignedInteger('stock')->default(0);`],
+['Model + relasi + scope',`class Product extends Model {
+    public function category() { return $this->belongsTo(Category::class); }
+    public function tags()     { return $this->belongsToMany(Tag::class); }
+    public function scopeLowStock($q) { return $q->where('stock', '<', 5); }
+}
+class User extends Authenticatable {
+    public function orders() { return $this->hasMany(Order::class); }
+}`],
+['Seeder 50+ produk',`Category::factory()->count(3)->create();
+Product::factory()->count(56)->create();
+// php artisan migrate:fresh --seed`],
+['Breeze + role + middleware',`composer require laravel/breeze --dev
+php artisan breeze:install blade
+// users: $t->string('role')->default('user');
+php artisan make:middleware EnsureRole
+
+public function handle($r, Closure $next, string $role) {
+    abort_unless($r->user()?->role === $role, 403);
+    return $next($r);
+}
+Route::middleware(['auth','role:admin'])->prefix('admin')->group(...);`],
+['PostPolicy',`public function update(User $u, Post $p): bool {
+    return $u->id === $p->user_id || $u->role === 'editor';
+}
+public function delete(User $u, Post $p): bool {
+    return $u->id === $p->user_id || $u->role === 'admin';
+}
+$this->authorize('update', $post);`],
+['Bonus: eager loading',`Model::preventLazyLoading(! app()->isProduction());
+Product::with('category', 'tags')->paginate(6);`]];
+function render(){
+ document.getElementById('tabs').innerHTML=Object.entries(T).map(([k,l])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';toast=null;render()">${l}</button>`).join('');
+ document.getElementById('toast').innerHTML=toast?`<div class="toast ${toast[0]}">${esc(toast[1])}</div>`:'';toast=null;
+ document.getElementById('v').innerHTML=V[tab]();
+}
+render();
+</script></body></html>
